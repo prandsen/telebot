@@ -1,0 +1,17 @@
+# Ignore everything except source
+**/.vs
+**/bin
+**/obj
+**/out
+**/*.user
+**/*.suo
+**/*.nupkg
+**/*.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.env
+
+# Allow src folder
+!src/**
