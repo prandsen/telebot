@@ -1,0 +1,11 @@
+services:
+  telebot:
+    image: prandyhub/telebot:latest
+    restart: unless-stopped
+    environment:
+      - Telebot__Token='Token'
+      - Telebot__Downloader__Proxy='socks5://user:pass@host:port'
+      - Telebot__GloryRussia__Enabled=true
+      - Telebot__Downloader__Cookies=/cookies/cookies.txt
+    volumes:
+      - /cookies:/cookies

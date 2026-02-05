@@ -1,0 +1,33 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Telebot", "src\Telebot\Telebot.csproj", "{586E1FD9-AC56-4105-86E0-02DF019172BA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "misc", "misc", "{91C6E819-1F42-4449-B6CC-205ED0C67B4B}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose.yaml = docker-compose.yaml
+		Dockerfile = Dockerfile
+		.dockerignore = .dockerignore
+		.gitignore = .gitignore
+		docker-compose.override.yml = docker-compose.override.yml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{586E1FD9-AC56-4105-86E0-02DF019172BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{586E1FD9-AC56-4105-86E0-02DF019172BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{586E1FD9-AC56-4105-86E0-02DF019172BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{586E1FD9-AC56-4105-86E0-02DF019172BA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A64CF0DB-5B27-49B8-9E58-BC1ABB76E27F}
+	EndGlobalSection
+EndGlobal

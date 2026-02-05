@@ -40,6 +40,12 @@ ScaffoldingReadMe.txt
 ~$*
 *~
 CodeCoverage/
+docker-compose.override.yml
+.vs/
+.idea/
+
+# Visual Studio user files
+*.user
 
 # MSBuild Binary and Structured Log
 *.binlog
