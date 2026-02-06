@@ -3,7 +3,7 @@ namespace Telebot.Settings;
 public class TelebotSettings
 {
     public required string Token { get; set; }
-    public required TimeSpan SpamDelay { get; set; } = TimeSpan.FromSeconds(60);
+    public required TimeSpan SpamDelay { get; set; } = TimeSpan.FromSeconds(30);
     public DownloaderSettings Downloader { get; set; } = new ();
 }
 

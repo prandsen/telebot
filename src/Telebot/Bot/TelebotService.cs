@@ -20,8 +20,8 @@ public partial class TelebotService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly Lazy<Task<string>> _triggers;
     private readonly TimeSpan _spamDelay;
-    private readonly ConcurrentDictionary<string, DateTime> _triggerTimeouts = new();
-    private readonly ConcurrentDictionary<string, int> _triggerCounters = new();
+    private readonly ConcurrentDictionary<long, DateTime> _triggerTimeouts = new();
+    private readonly ConcurrentDictionary<long, int> _triggerCounters = new();
     private readonly Random _random = new(69);
 
     public TelebotService(IOptions<TelebotSettings> options, IHttpClientFactory httpClientFactory, VideoDownloader downloader, ILogger<TelebotService> logger)
@@ -91,30 +91,29 @@ public partial class TelebotService
         {
             if (!trigger.IsTriggered) continue;
 
-            if (!_triggerTimeouts.TryGetValue(trigger.Reply, out var triggerNextDate))
+            if (!_triggerTimeouts.TryGetValue(msg.From.Id, out var triggerNextDate))
             {
-                _triggerTimeouts.TryAdd(trigger.Reply, DateTime.UtcNow);
+                _triggerTimeouts.TryAdd(msg.From.Id, DateTime.UtcNow);
             }
-            if (!_triggerCounters.TryGetValue(trigger.Reply, out var triggerCounter))
+            if (!_triggerCounters.TryGetValue(msg.From.Id, out var triggerCounter))
             {
-                _triggerCounters.TryAdd(trigger.Reply, 0);
+                _triggerCounters.TryAdd(msg.From.Id, 0);
             }
             
             if (triggerNextDate > DateTime.UtcNow)
             {
-                _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
                 continue;
             }
 
-            if (triggerCounter >= 2)
+            if (triggerCounter >= 5)
             {
-                await ReplyTo(msg, "Отпусти руки от клавы сдвгшник дерганный", ct);
-                _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
-                _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                await ReplyTo(msg, $"Отпусти руки от клавы сдвгшник дерганный. Отдохни {_spamDelay.Seconds}c", ct);
+                _triggerTimeouts.TryUpdate(msg.From.Id, DateTime.UtcNow + _spamDelay, triggerNextDate);
+                _triggerCounters.TryUpdate(msg.From.Id, 0, triggerCounter);
                 continue;
             }
             
-            _triggerCounters.TryUpdate(trigger.Reply, triggerCounter + 1, triggerCounter);
+            _triggerCounters.TryUpdate(msg.From.Id, triggerCounter + 1, triggerCounter);
             
             await ReplyTo(msg, trigger.Reply, ct);
             return;
