@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Telebot.Settings;
@@ -16,12 +17,16 @@ public partial class TelebotService
     private readonly ILogger<TelebotService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly Lazy<Task<string>> _triggers;
+    private readonly TimeSpan _spamDelay;
+    private readonly ConcurrentDictionary<string, DateTime> _triggerTimeouts = new();
+    private readonly ConcurrentDictionary<string, int> _triggerCounters = new();
 
     public TelebotService(IOptions<TelebotSettings> options, IHttpClientFactory httpClientFactory, VideoDownloader downloader, ILogger<TelebotService> logger)
     {
         _logger = logger;
         _downloader = downloader;
-        _httpClientFactory =  httpClientFactory;
+        _httpClientFactory = httpClientFactory;
+        _spamDelay = options.Value.SpamDelay;
         var token = options.Value.Token;
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -72,6 +77,31 @@ public partial class TelebotService
             foreach (var trigger in triggers)
             {
                 if (!trigger.IsTriggered) continue;
+
+                if (!_triggerTimeouts.TryGetValue(trigger.Reply, out var triggerNextDate))
+                {
+                    _triggerTimeouts.TryAdd(trigger.Reply, DateTime.UtcNow);
+                }
+                if (!_triggerCounters.TryGetValue(trigger.Reply, out var triggerCounter))
+                {
+                    _triggerCounters.TryAdd(trigger.Reply, 0);
+                }
+                
+                if (triggerNextDate > DateTime.UtcNow)
+                {
+                    continue;
+                }
+
+                if (triggerCounter >= 2)
+                {
+                    await ReplyTo(msg, "Охлади пыл, родной (уебок)", ct);
+                    _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
+                    _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                    continue;
+                }
+                
+                _triggerCounters.TryUpdate(trigger.Reply, triggerCounter + 1, triggerCounter);
+                
                 await ReplyTo(msg, trigger.Reply, ct);
                 return;
             }
