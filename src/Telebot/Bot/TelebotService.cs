@@ -108,7 +108,7 @@ public partial class TelebotService
 
             if (triggerCounter >= 2)
             {
-                await ReplyTo(msg, "Охлади пыл, родной (уебок)", ct);
+                await ReplyTo(msg, "Отпусти руки от клавы сдвгшник дерганный", ct);
                 _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
                 _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
                 continue;
