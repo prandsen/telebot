@@ -1,5 +1,3 @@
-using System;
-
 namespace Telebot.Settings;
 
 public class TelebotSettings
@@ -10,7 +8,6 @@ public class TelebotSettings
 
 public class DownloaderSettings
 {
-    public string? Proxy { get; set; }
     public string? Cookies { get; set; }
     public int MaxSizeMb { get; set; } = 50;
 }

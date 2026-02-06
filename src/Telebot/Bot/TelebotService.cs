@@ -78,7 +78,11 @@ public partial class TelebotService
             
             var youtubeUrl = ExtractYoutubeUrl(msg.Text);
             var instagramUrl = ExtractInstagramUrl(msg.Text);
-            if (string.IsNullOrWhiteSpace(youtubeUrl) && string.IsNullOrWhiteSpace(instagramUrl))
+            var tiktokUrl = ExtractTikTokUrl(msg.Text);
+            
+            if (string.IsNullOrWhiteSpace(youtubeUrl) && 
+                string.IsNullOrWhiteSpace(instagramUrl) && 
+                string.IsNullOrWhiteSpace(tiktokUrl))
             {
                 _logger.LogInformation("No supported video URL found in message {MessageId}.", msg.MessageId);
                 return;
@@ -88,6 +92,7 @@ public partial class TelebotService
 
             await HandleUrl(msg, youtubeUrl, x => _downloader.DownloadYoutubeAsync(x), ct);
             await HandleUrl(msg, instagramUrl, x => _downloader.DownloadInstagramAsync(x), ct);
+            await HandleUrl(msg, tiktokUrl, x => _downloader.DownloadTikTokAsync(x), ct);
         }
         catch (Exception ex)
         {
@@ -146,12 +151,21 @@ public partial class TelebotService
         }
     }
 
+    [GeneratedRegex(@"(https?://(?:www\.)?(?:youtube\.com)/shorts/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex YoutubeRegex();
+    
     private static string? ExtractYoutubeUrl(string text)
     {
-        var ytMatch = YoutubeRegex().Match(text);
-        var youtubeUrl = ytMatch.Success ? ytMatch.Groups[1].Value : null;
-        return youtubeUrl;
+        var match = YoutubeRegex().Match(text);
+        var url = match.Success ? match.Groups[1].Value : null;
+        return url;
     }
+    
+    [GeneratedRegex(@"(https?://(?:www\.)?instagram\.com/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex InstagramRegex();
+    
+    [GeneratedRegex(@"https?://(?:www\.)?instagram\.com/(p|reel|tv)/([^/?#]+)/?", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex InstagramShortRegex();
     
     private static string? ExtractInstagramUrl(string text)
     {
@@ -162,6 +176,16 @@ public partial class TelebotService
         var instShortUrl = instShortMatch.Success ? instShortMatch.Groups[1].Value : null;
         
         return instUrl ?? instShortUrl;
+    }
+    
+    [GeneratedRegex(@"(https?://(?:www\.)?(?:tiktok\.com)/@[^\s]+/video/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex TikTokRegex();
+    
+    private static string? ExtractTikTokUrl(string text)
+    {
+        var match = TikTokRegex().Match(text);
+        var url = match.Success ? match.Groups[1].Value : null;
+        return url;
     }
 
     private async Task<string> DownloadTriggers()
@@ -216,33 +240,12 @@ public partial class TelebotService
         return triggers;
         
         void LogError(int index) => _logger.LogWarning("Can't parse trigger row. Index: {Index}", index);
-    }
-    
-    private static (bool IsTriggered, string Reply) TriggeredReply(string msgText, IReadOnlyCollection<string> patterns, string reply)
-    {
-        var trigger = patterns.Any(x => msgText.Contains(x, StringComparison.InvariantCultureIgnoreCase));
-        return (trigger, reply);
-    }
-    
-    private static bool IsLiberaha(string text)
-    {
-        var patterns = new[]
+        
+        (bool IsTriggered, string Reply) TriggeredReply(string msgText, IReadOnlyCollection<string> patterns, string reply)
         {
-            "либераха", "либерал", "либерашка", "1984"
-        };
-        return patterns.Any(x => text.Contains(x, StringComparison.InvariantCultureIgnoreCase));
-    }
-    
-    private static bool IsTagged(string text)
-    {
-        var patterns = new[] { "@down_yt_ig_bot" };
-        return patterns.Any(x => text.Contains(x, StringComparison.InvariantCultureIgnoreCase));
-    }
-    
-    private static bool IsDown(string text)
-    {
-        var patterns = new[] { "даун" };
-        return patterns.Any(x => text.Contains(x, StringComparison.InvariantCultureIgnoreCase));
+            var trigger = patterns.Any(x => msgText.Contains(x, StringComparison.InvariantCultureIgnoreCase));
+            return (trigger, reply);
+        }
     }
 
     private Task HandleError(ITelegramBotClient bot, Exception ex, CancellationToken ct)
@@ -256,13 +259,4 @@ public partial class TelebotService
         var replyParams = new ReplyParameters { MessageId = msg.MessageId };
         await _bot.SendMessage(msg.Chat.Id, text, replyParameters: replyParams, cancellationToken: ct);
     }
-
-    [GeneratedRegex(@"(https?://(?:www\.)?(?:youtube\.com)/shorts/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex YoutubeRegex();
-    
-    [GeneratedRegex(@"(https?://(?:www\.)?instagram\.com/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex InstagramRegex();
-    
-    [GeneratedRegex(@"instagram\.com/(p|reel|tv)/([^/?#]+)/?", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex InstagramShortRegex();
 }
