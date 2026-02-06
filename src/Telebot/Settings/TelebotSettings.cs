@@ -10,5 +10,5 @@ public class TelebotSettings
 public class DownloaderSettings
 {
     public string? Cookies { get; set; }
-    public int MaxSizeMb { get; set; } = 10;
+    public int MaxSizeMb { get; set; } = 20;
 }
