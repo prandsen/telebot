@@ -14,10 +14,12 @@ Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.Configure<TelebotSettings>(context.Configuration.GetSection("Telebot"));
-
+        
         services.AddSingleton<VideoDownloader>();
         services.AddSingleton<TelebotService>();
         services.AddHostedService<BotWorker>();
+
+        services.AddHttpClient();
     })
     .Build()
     .Run();

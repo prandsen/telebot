@@ -14,19 +14,22 @@ public partial class TelebotService
     private readonly TelegramBotClient _bot;
     private readonly VideoDownloader _downloader;
     private readonly ILogger<TelebotService> _logger;
-    private readonly TelebotSettings _botSettings;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly Lazy<Task<string>> _triggers;
 
-    public TelebotService(IOptions<TelebotSettings> options, VideoDownloader downloader, ILogger<TelebotService> logger)
+    public TelebotService(IOptions<TelebotSettings> options, IHttpClientFactory httpClientFactory, VideoDownloader downloader, ILogger<TelebotService> logger)
     {
         _logger = logger;
         _downloader = downloader;
-        _botSettings = options.Value;
+        _httpClientFactory =  httpClientFactory;
         var token = options.Value.Token;
         if (string.IsNullOrWhiteSpace(token))
         {
             _logger.LogCritical("Telegram bot token is missing in configuration (Bot:Token).");
             throw new ArgumentException("Bot token is required", nameof(options));
         }
+
+        _triggers = new Lazy<Task<string>>(DownloadTriggers); 
 
         _bot = new TelegramBotClient(token);
     }
@@ -64,23 +67,12 @@ public partial class TelebotService
 
             _logger.LogInformation("Received message from chat {ChatId}: {Text}", msg.Chat.Id, msg.Text);
 
-            var isLibaraha = IsLiberaha(msg.Text);
-            if (_botSettings.GloryRussia.Enabled && isLibaraha)
+            var triggersText = await _triggers.Value;
+            var triggers = await GetTriggers(msg.Text, triggersText);
+            foreach (var trigger in triggers)
             {
-                await ReplyTo(msg, "Слава России!!! Либерахи сосать!!!", ct);
-            }
-            
-            var isTagged = IsTagged(msg.Text);
-            if (isTagged)
-            {
-                await ReplyTo(msg, "Хули ты меня тегаешь долбоеб", ct);
-                return;
-            }
-            
-            var isDown = IsDown(msg.Text);
-            if (isDown)
-            {
-                await ReplyTo(msg, "Единственный тут даун это ты", ct);
+                if (!trigger.IsTriggered) continue;
+                await ReplyTo(msg, trigger.Reply, ct);
                 return;
             }
             
@@ -171,6 +163,66 @@ public partial class TelebotService
         
         return instUrl ?? instShortUrl;
     }
+
+    private async Task<string> DownloadTriggers()
+    {
+        using var httpClient = _httpClientFactory.CreateClient();
+        
+        var stream = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get,
+            "https://raw.githubusercontent.com/prandsen/telebot/refs/heads/main/TriggerList.txt"));
+        if (!stream.IsSuccessStatusCode)
+        {
+            _logger.LogError("Getting trigger list returned status code {StatusCode}", stream.StatusCode);
+            return null;
+        }
+
+        var content = await stream.Content.ReadAsStringAsync();
+        return content;
+    }
+    
+    private async Task<IReadOnlyCollection<(bool IsTriggered, string Reply)>> GetTriggers(string msgText, string triggersText)
+    {
+        if (string.IsNullOrWhiteSpace(triggersText))
+        {
+            _logger.LogWarning("Trigger list is null or empty");
+            return [];
+        }
+        
+        var triggerRows = triggersText.Replace("\r\n","\n").Split("\n", StringSplitOptions.RemoveEmptyEntries);
+        
+        var triggers = new List<(bool IsTriggered, string Reply)>();
+        for (var i = 0; i < triggerRows.Length; i++)
+        {
+            var item = triggerRows[i];
+            var left = item.Split("=", StringSplitOptions.RemoveEmptyEntries);
+            if (left.Length != 2)
+            {
+                LogError(i);
+                continue;
+            }
+
+            var patterns = left[0].Split(",", StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
+            var reply = left[1].Trim();
+            
+            if (patterns.Length == 0 || string.IsNullOrWhiteSpace(reply))
+            {
+                LogError(i);
+                continue;
+            }
+            
+            var trigger = TriggeredReply(msgText, patterns, reply);
+            triggers.Add(trigger);
+        }
+        return triggers;
+        
+        void LogError(int index) => _logger.LogWarning("Can't parse trigger row. Index: {Index}", index);
+    }
+    
+    private static (bool IsTriggered, string Reply) TriggeredReply(string msgText, IReadOnlyCollection<string> patterns, string reply)
+    {
+        var trigger = patterns.Any(x => msgText.Contains(x, StringComparison.InvariantCultureIgnoreCase));
+        return (trigger, reply);
+    }
     
     private static bool IsLiberaha(string text)
     {
@@ -205,7 +257,7 @@ public partial class TelebotService
         await _bot.SendMessage(msg.Chat.Id, text, replyParameters: replyParams, cancellationToken: ct);
     }
 
-    [GeneratedRegex(@"(https?://(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"(https?://(?:www\.)?(?:youtube\.com)/shorts/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex YoutubeRegex();
     
     [GeneratedRegex(@"(https?://(?:www\.)?instagram\.com/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
