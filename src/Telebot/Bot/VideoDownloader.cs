@@ -17,7 +17,6 @@ public class VideoDownloader
     {
         _logger = logger;
         var settings = opts.Value;
-        _proxy = settings.Downloader.Proxy;
         _cookies = settings.Downloader.Cookies;
         _maxSizeMb = settings.Downloader.MaxSizeMb;
     }
@@ -25,13 +24,7 @@ public class VideoDownloader
     public async Task<DownloadResult> DownloadYoutubeAsync(string url)
     {
         var output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
-
-        var args =
-            $"-f \"bv*[filesize_approx<={_maxSizeMb}M]+ba/b\" " +
-            $"--merge-output-format mp4 " +
-            (string.IsNullOrEmpty(_proxy) ? string.Empty : $"--proxy \"{_proxy}\" ") +
-            $"-o \"{output}\" \"{url}\"";
-        
+        var args = GetDefaulyArgs(url, output);
         return await DownloadAsync(url, output, args); 
     }
     
@@ -41,10 +34,16 @@ public class VideoDownloader
         
         var args =
             "-f mp4 --no-playlist " +
-            (string.IsNullOrEmpty(_proxy) ? string.Empty : $"--proxy \"{_proxy}\" ") +
             (string.IsNullOrEmpty(_cookies) ? string.Empty : $"--cookies \"{_cookies}\" ") +
             $"-o \"{output}\" \"{url}\"";
         
+        return await DownloadAsync(url, output, args);
+    }
+    
+    public async Task<DownloadResult> DownloadTikTokAsync(string url)
+    {
+        var output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
+        var args = GetDefaulyArgs(url, output);
         return await DownloadAsync(url, output, args);
     }
 
@@ -101,5 +100,14 @@ public class VideoDownloader
 
         _logger.LogInformation("Downloaded video to {Path} ({Size} bytes)", output, fileLen);
         return new DownloadResult(output);
+    }
+
+    private string GetDefaulyArgs(string url, string output)
+    {
+        return $"-f \"bv*[filesize_approx<={_maxSizeMb}M]/bv*+ba/b\" " +
+               "--merge-output-format mp4 " +
+               "--no-playlist " +
+               "--remux-video mp4 " +
+               $"-o \"{output}\" \"{url}\"";
     }
 }
