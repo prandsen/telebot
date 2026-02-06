@@ -25,11 +25,13 @@ public class VideoDownloader
     {
         var output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
         
-        var args = $"-f \"bv*[filesize_approx<={_maxSizeMb}M]+ba/b[filesize_approx<={_maxSizeMb}M]\" " +
-                   "--merge-output-format mp4 " +
-                   "--no-playlist " +
-                   "--remux-video mp4 " +
-                   $"-o \"{output}\" \"{url}\"";
+        var args = $"-f \"bv*[vcodec^=avc1][filesize_approx<={_maxSizeMb}M]+ba[acodec^=mp4a]/bv*[vcodec^=avc1][filesize_approx<={_maxSizeMb}M]+ba/bv*[filesize_approx<={_maxSizeMb}M]+ba/b\" " +
+            "--merge-output-format mp4 " +
+            "--no-playlist " +
+            "--recode-video mp4 " +
+            "--postprocessor-args \"FFmpegVideoConvertor:-vf scale=trunc(iw/2)*2:trunc(ih/2)*2\" " +
+            "--remote-components ejs:npm " +
+            $"-o \"{output}\" \"{url}\"";
         
         return await DownloadAsync(url, output, args); 
     }
@@ -40,6 +42,7 @@ public class VideoDownloader
         
         var args =
             "-f mp4 --no-playlist " +
+            "--remote-components ejs:npm " +
             (string.IsNullOrEmpty(_cookies) ? string.Empty : $"--cookies \"{_cookies}\" ") +
             $"-o \"{output}\" \"{url}\"";
         
@@ -54,6 +57,7 @@ public class VideoDownloader
                "--merge-output-format mp4 " +
                "--no-playlist " +
                "--remux-video mp4 " +
+               "--remote-components ejs:npm " +
                $"-o \"{output}\" \"{url}\"";
         
         return await DownloadAsync(url, output, args);

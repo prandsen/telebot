@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Telebot.Settings;
@@ -16,12 +17,17 @@ public partial class TelebotService
     private readonly ILogger<TelebotService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly Lazy<Task<string>> _triggers;
+    private readonly TimeSpan _spamDelay;
+    private readonly ConcurrentDictionary<string, DateTime> _triggerTimeouts = new();
+    private readonly ConcurrentDictionary<string, int> _triggerCounters = new();
+    private readonly Random _random = new(69);
 
     public TelebotService(IOptions<TelebotSettings> options, IHttpClientFactory httpClientFactory, VideoDownloader downloader, ILogger<TelebotService> logger)
     {
         _logger = logger;
         _downloader = downloader;
-        _httpClientFactory =  httpClientFactory;
+        _httpClientFactory = httpClientFactory;
+        _spamDelay = options.Value.SpamDelay;
         var token = options.Value.Token;
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -72,6 +78,32 @@ public partial class TelebotService
             foreach (var trigger in triggers)
             {
                 if (!trigger.IsTriggered) continue;
+
+                if (!_triggerTimeouts.TryGetValue(trigger.Reply, out var triggerNextDate))
+                {
+                    _triggerTimeouts.TryAdd(trigger.Reply, DateTime.UtcNow);
+                }
+                if (!_triggerCounters.TryGetValue(trigger.Reply, out var triggerCounter))
+                {
+                    _triggerCounters.TryAdd(trigger.Reply, 0);
+                }
+                
+                if (triggerNextDate > DateTime.UtcNow)
+                {
+                    _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                    continue;
+                }
+
+                if (triggerCounter >= 2)
+                {
+                    await ReplyTo(msg, "Охлади пыл, родной (уебок)", ct);
+                    _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
+                    _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                    continue;
+                }
+                
+                _triggerCounters.TryUpdate(trigger.Reply, triggerCounter + 1, triggerCounter);
+                
                 await ReplyTo(msg, trigger.Reply, ct);
                 return;
             }
@@ -224,33 +256,34 @@ public partial class TelebotService
         for (var i = 0; i < triggerRows.Length; i++)
         {
             var item = triggerRows[i];
-            var left = item.Split("=", StringSplitOptions.RemoveEmptyEntries);
-            if (left.Length != 2)
+            var kv = item.Split("=", StringSplitOptions.RemoveEmptyEntries);
+            if (kv.Length != 2)
             {
                 LogError(i);
                 continue;
             }
 
-            var patterns = left[0].Split(",", StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
-            var reply = left[1].Trim();
+            var patterns = kv[0].Split(";", StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
+            var replies = kv[1].Split(";", StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
             
-            if (patterns.Length == 0 || string.IsNullOrWhiteSpace(reply))
+            if (patterns.Length == 0 || replies.Length == 0)
             {
                 LogError(i);
                 continue;
             }
             
-            var trigger = TriggeredReply(msgText, patterns, reply);
+            var trigger = TriggeredReply(msgText, patterns, replies);
             triggers.Add(trigger);
         }
         return triggers;
         
         void LogError(int index) => _logger.LogWarning("Can't parse trigger row. Index: {Index}", index);
         
-        (bool IsTriggered, string Reply) TriggeredReply(string msgText, IReadOnlyCollection<string> patterns, string reply)
+        (bool IsTriggered, string Reply) TriggeredReply(string msgText, IReadOnlyCollection<string> patterns, IReadOnlyList<string> replies)
         {
             var trigger = patterns.Any(x => msgText.Contains(x, StringComparison.InvariantCultureIgnoreCase));
-            return (trigger, reply);
+            var randomIndex = _random.Next(0, replies.Count);
+            return (trigger, replies[randomIndex]);
         }
     }
 
