@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "misc", "misc", "{91C6E819-1
 		.dockerignore = .dockerignore
 		.gitignore = .gitignore
 		docker-compose.override.yml = docker-compose.override.yml
+		docker-push.sh = docker-push.sh
 	EndProjectSection
 EndProject
 Global
