@@ -64,7 +64,7 @@ public partial class TelebotService
             {
                 UpdateType.Message => HandleMessage(update, ct),
                 UpdateType.InlineQuery => HandleInlineQuery(update, ct),
-                _ => new Task(() => _logger.LogDebug("Ignored update type: {Type}", update.Type))
+                _ => Task.CompletedTask
             };
             await handler;
         }
