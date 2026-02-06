@@ -12,6 +12,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "misc", "misc", "{91C6E819-1
 		.gitignore = .gitignore
 		docker-compose.override.yml = docker-compose.override.yml
 		docker-deploy.sh = docker-deploy.sh
+		TriggerList.txt = TriggerList.txt
 	EndProjectSection
 EndProject
 Global
