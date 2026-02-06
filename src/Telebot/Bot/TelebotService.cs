@@ -5,8 +5,10 @@ using Telebot.Settings;
 using Telegram.Bot;
 using System.Text.RegularExpressions;
 using Telebot.Errors;
+using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.InlineQueryResults;
 
 namespace Telebot.Bot;
 
@@ -58,78 +60,115 @@ public partial class TelebotService
     {
         try
         {
-            if (update.Type != UpdateType.Message)
+            var handler = update.Type switch
             {
-                _logger.LogDebug("Ignored update type: {Type}", update.Type);
-                return;
-            }
-
-            var msg = update.Message;
-            if (msg?.Text == null)
-            {
-                _logger.LogDebug("Ignored message without text or null message.");
-                return;
-            }
-
-            _logger.LogInformation("Received message from chat {ChatId}: {Text}", msg.Chat.Id, msg.Text);
-
-            var triggersText = await _triggers.Value;
-            var triggers = await GetTriggers(msg.Text, triggersText);
-            foreach (var trigger in triggers)
-            {
-                if (!trigger.IsTriggered) continue;
-
-                if (!_triggerTimeouts.TryGetValue(trigger.Reply, out var triggerNextDate))
-                {
-                    _triggerTimeouts.TryAdd(trigger.Reply, DateTime.UtcNow);
-                }
-                if (!_triggerCounters.TryGetValue(trigger.Reply, out var triggerCounter))
-                {
-                    _triggerCounters.TryAdd(trigger.Reply, 0);
-                }
-                
-                if (triggerNextDate > DateTime.UtcNow)
-                {
-                    _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
-                    continue;
-                }
-
-                if (triggerCounter >= 2)
-                {
-                    await ReplyTo(msg, "Охлади пыл, родной (уебок)", ct);
-                    _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
-                    _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
-                    continue;
-                }
-                
-                _triggerCounters.TryUpdate(trigger.Reply, triggerCounter + 1, triggerCounter);
-                
-                await ReplyTo(msg, trigger.Reply, ct);
-                return;
-            }
-            
-            var youtubeUrl = ExtractYoutubeUrl(msg.Text);
-            var instagramUrl = ExtractInstagramUrl(msg.Text);
-            var tiktokUrl = ExtractTikTokUrl(msg.Text);
-            
-            if (string.IsNullOrWhiteSpace(youtubeUrl) && 
-                string.IsNullOrWhiteSpace(instagramUrl) && 
-                string.IsNullOrWhiteSpace(tiktokUrl))
-            {
-                _logger.LogInformation("No supported video URL found in message {MessageId}.", msg.MessageId);
-                return;
-            }
-            
-            _logger.LogInformation("Download URLs: {Urls}", string.Join(", ", youtubeUrl, instagramUrl));
-
-            await HandleUrl(msg, youtubeUrl, x => _downloader.DownloadYoutubeAsync(x), ct);
-            await HandleUrl(msg, instagramUrl, x => _downloader.DownloadInstagramAsync(x), ct);
-            await HandleUrl(msg, tiktokUrl, x => _downloader.DownloadTikTokAsync(x), ct);
+                UpdateType.Message => HandleMessage(update, ct),
+                UpdateType.InlineQuery => HandleInlineQuery(update, ct),
+                _ => new Task(() => _logger.LogDebug("Ignored update type: {Type}", update.Type))
+            };
+            await handler;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling update of type {UpdateType}", update.Type);
         }
+    }
+
+    private async Task HandleMessage(Update update, CancellationToken ct)
+    {
+        var msg = update.Message;
+        if (msg?.Text == null)
+        {
+            _logger.LogDebug("Ignored message without text or null message.");
+            return;
+        }
+
+        _logger.LogInformation("Received message from chat {ChatId}: {Text}", msg.Chat.Id, msg.Text);
+
+        var triggersText = await _triggers.Value;
+        var triggers = await GetTriggers(msg.Text, triggersText);
+        foreach (var trigger in triggers)
+        {
+            if (!trigger.IsTriggered) continue;
+
+            if (!_triggerTimeouts.TryGetValue(trigger.Reply, out var triggerNextDate))
+            {
+                _triggerTimeouts.TryAdd(trigger.Reply, DateTime.UtcNow);
+            }
+            if (!_triggerCounters.TryGetValue(trigger.Reply, out var triggerCounter))
+            {
+                _triggerCounters.TryAdd(trigger.Reply, 0);
+            }
+            
+            if (triggerNextDate > DateTime.UtcNow)
+            {
+                _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                continue;
+            }
+
+            if (triggerCounter >= 2)
+            {
+                await ReplyTo(msg, "Охлади пыл, родной (уебок)", ct);
+                _triggerTimeouts.TryUpdate(trigger.Reply, DateTime.UtcNow + _spamDelay, triggerNextDate);
+                _triggerCounters.TryUpdate(trigger.Reply, 0, triggerCounter);
+                continue;
+            }
+            
+            _triggerCounters.TryUpdate(trigger.Reply, triggerCounter + 1, triggerCounter);
+            
+            await ReplyTo(msg, trigger.Reply, ct);
+            return;
+        }
+        
+        var youtubeUrl = ExtractYoutubeUrl(msg.Text);
+        var instagramUrl = ExtractInstagramUrl(msg.Text);
+        var tiktokUrl = ExtractTikTokUrl(msg.Text);
+        
+        if (string.IsNullOrWhiteSpace(youtubeUrl) && 
+            string.IsNullOrWhiteSpace(instagramUrl) && 
+            string.IsNullOrWhiteSpace(tiktokUrl))
+        {
+            _logger.LogInformation("No supported video URL found in message {MessageId}.", msg.MessageId);
+            return;
+        }
+        
+        _logger.LogInformation("Download URLs: {Urls}", string.Join(", ", youtubeUrl, instagramUrl));
+
+        await HandleUrl(msg, youtubeUrl, x => _downloader.DownloadYoutubeAsync(x), ct);
+        await HandleUrl(msg, instagramUrl, x => _downloader.DownloadInstagramAsync(x), ct);
+        await HandleUrl(msg, tiktokUrl, x => _downloader.DownloadTikTokAsync(x), ct);
+    }
+    
+    private async Task HandleInlineQuery(Update update, CancellationToken ct)
+    {
+        var results = new List<InlineQueryResult>();
+        
+        var alko = 0.5 + _random.NextDouble() * _random.Next(1, 4);
+        var alkoResult = new InlineQueryResultArticle(
+            id: "alko",
+            title: "Сколько выпить",
+            inputMessageContent: new InputTextMessageContent(
+                $"@{update.InlineQuery.From.Username} на сегодня твоя норма {alko:F1}л пивасика")
+        );
+        results.Add(alkoResult);
+
+        var nahui = _random.NextDouble() > 0.5;
+        var nahuiResult = new InlineQueryResultArticle(
+            id: "nahui",
+            title: "Иди нахуй",
+            inputMessageContent: nahui
+                ? new InputTextMessageContent($"@{update.InlineQuery.From.Username} сегодня ты идешь нахуй")
+                : new InputTextMessageContent(
+                    $"@{update.InlineQuery.From.Username} сегодня тебе повезло и ты не идешь нахуй")
+        );
+        results.Add(nahuiResult);
+
+        await _bot.AnswerInlineQuery(
+            inlineQueryId: update.InlineQuery!.Id,
+            results: results,
+            cacheTime: 0,
+            isPersonal: true,
+            cancellationToken: ct);
     }
 
     private async Task HandleUrl(Message msg, string url, Func<string, Task<DownloadResult>> downloadFunc, CancellationToken ct)
