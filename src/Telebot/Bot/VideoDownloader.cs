@@ -24,7 +24,13 @@ public class VideoDownloader
     public async Task<DownloadResult> DownloadYoutubeAsync(string url)
     {
         var output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
-        var args = GetDefaulyArgs(url, output);
+        
+        var args = $"-f \"bv*[filesize_approx<={_maxSizeMb}M]+ba/b[filesize_approx<={_maxSizeMb}M]\" " +
+                   "--merge-output-format mp4 " +
+                   "--no-playlist " +
+                   "--remux-video mp4 " +
+                   $"-o \"{output}\" \"{url}\"";
+        
         return await DownloadAsync(url, output, args); 
     }
     
@@ -43,7 +49,13 @@ public class VideoDownloader
     public async Task<DownloadResult> DownloadTikTokAsync(string url)
     {
         var output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
-        var args = GetDefaulyArgs(url, output);
+        
+        var args = $"-f \"bv*[filesize_approx<={_maxSizeMb}M]/bv*+ba/b\" " +
+               "--merge-output-format mp4 " +
+               "--no-playlist " +
+               "--remux-video mp4 " +
+               $"-o \"{output}\" \"{url}\"";
+        
         return await DownloadAsync(url, output, args);
     }
 
@@ -100,14 +112,5 @@ public class VideoDownloader
 
         _logger.LogInformation("Downloaded video to {Path} ({Size} bytes)", output, fileLen);
         return new DownloadResult(output);
-    }
-
-    private string GetDefaulyArgs(string url, string output)
-    {
-        return $"-f \"bv*[filesize_approx<={_maxSizeMb}M]/bv*+ba/b\" " +
-               "--merge-output-format mp4 " +
-               "--no-playlist " +
-               "--remux-video mp4 " +
-               $"-o \"{output}\" \"{url}\"";
     }
 }

@@ -180,12 +180,18 @@ public partial class TelebotService
     
     [GeneratedRegex(@"(https?://(?:www\.)?(?:tiktok\.com)/@[^\s]+/video/[^\s]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex TikTokRegex();
+    [GeneratedRegex(@"(https?://(?:www\.)?(?:vt.tiktok\.com)/[^\s/@]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex TikTokShortRegex();
     
     private static string? ExtractTikTokUrl(string text)
     {
         var match = TikTokRegex().Match(text);
         var url = match.Success ? match.Groups[1].Value : null;
-        return url;
+        
+        var matchShort = TikTokShortRegex().Match(text);
+        var shortUrl = matchShort.Success ? matchShort.Groups[1].Value : null;
+        
+        return url ?? shortUrl;
     }
 
     private async Task<string> DownloadTriggers()
