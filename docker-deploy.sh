@@ -36,7 +36,6 @@ docker pull $FULL_IMAGE_NAME
 echo "▶ docker compose up telebot -d"
 docker compose up telebot -d
 
-echo "✅ Remote deploy done"
 EOF
 
 echo "✅ Done"
